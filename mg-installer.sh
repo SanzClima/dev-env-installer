@@ -17,20 +17,35 @@ check_if_installed() {
 }
 
 install_packages() {
-	apt-get update
-	apt-get install -y $@
+	apt update
+	apt install -y $@
 	echo -e "${GREEN}- Installed. ($@)${NC}"
 }
 
 # Functions for installing packages
+
+generate_ssh_key() {
+	ssh-keygen -t ed25519 -C "marcogonzalo@gmail.com"
+	ssh-keygen -p -f ~/.ssh/id_ed25519
+	eval "$(ssh-agent -s)"
+	ssh-add ~/.ssh/id_ed25519
+	apt install xclip
+	xclip -selection clipboard < ~/.ssh/id_ed25519.pub
+}
 
 install_utilities() {
 	echo -e "${BLUE}Installing utilities:${NC}"
 	check_if_installed "filezilla"
         RESPONSE=$?
         if [ "$RESPONSE" -ne "1" ]; then
-		install_packages "terminator" "filezilla" "gnome-tweak-tool"
+		install_packages "npm" "terminator"
 	fi
+}
+
+install_dbeaver() {
+	add-apt-repository ppa:serge-rider/dbeaver-ce
+	apt update
+	apt install dbeaver-ce
 }
 
 install_docker() {
@@ -38,19 +53,23 @@ install_docker() {
 	check_if_installed "docker-ce"
 	RESPONSE=$?
 	if [ "$RESPONSE" -ne "1" ]; then
-		apt-get remove docker docker-engine docker.io -y
-		apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-		curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-		apt-key fingerprint 0EBFCD88
-		echo "deb [arch=$(uname -m)] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list
-		install_packages "docker-ce"
+		apt remove -y docker docker-engine docker.io containerd runc
+ 		apt install -y apt-transport-https ca-certificates curl gnupg lsb-release software-properties-common 
+		curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+		echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+		install_packages "docker-ce" "docker-ce-cli" "containerd.io"
 	fi
 	echo -e "${BLUE}Installing Docker Compose:${NC}"
+	groupadd docker
+	usermod -aG docker $USER
+	newgrp docker
 	check_if_installed "docker-compose"
 	RESPONSE=$?
 	if [ "$RESPONSE" -ne "1" ]; then
-		curl -L "https://github.com/docker/compose/releases/download/1.23.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+		curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 		chmod +x /usr/local/bin/docker-compose
+		curl -L https://raw.githubusercontent.com/docker/compose/1.29.2/contrib/completion/bash/docker-compose -o /etc/bash_completion.d/docker-compose
+		source ~/.bashrc
 		echo -e "${GREEN}$(docker-compose --version)"
 	fi
 }
@@ -77,7 +96,8 @@ install_git() {
 	fi
 	git config --global user.email "marcogonzalo@gmail.com"
 	git config --global user.name "@MarcoGonzalo"
-	echo -e "${YELLOW}Remember to set your SSH keys!${NC}"
+	echo -e "${YELLOW}Let's set your SSH keys!${NC}"
+	generate_ssh_key
 }
 
 install_sublime_text() {
@@ -92,14 +112,29 @@ install_sublime_text() {
 	fi
 }
 
+install_vscode() {
+	echo -e "${BLUE}Installing VSCode:${NC}"
+	check_if_installed "code"
+	RESPONSE=$?
+	if [ "$RESPONSE" -ne "1" ]; then
+		wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+		sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
+		sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
+		rm -f packages.microsoft.gpg
+	fi
+	apt install apt-transport-https
+	apt update
+	apt install code
+}
+
 echo -e "<--- ${ORANGE}Starting MGInstaller${NC} --->"
 echo -e "${BLUE}Updating and upgrading installed packages${NC}"
-apt-get update
-apt-get upgrade -y
+apt update
+apt upgrade -y
 install_utilities
-install_google_chrome
-install_sublime_text
-install_docker
 install_git
+install_docker
+install_vscode
+install_google_chrome
 
 exit 0
