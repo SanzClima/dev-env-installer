@@ -127,11 +127,20 @@ install_vscode() {
 	apt install code
 }
 
+install_npm() {
+	apt install curl 
+	curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
+	source ./profile
+	nvm install node
+	npm install -g npm
+}
+
 echo -e "<--- ${ORANGE}Starting MGInstaller${NC} --->"
 echo -e "${BLUE}Updating and upgrading installed packages${NC}"
 apt update
 apt upgrade -y
 install_utilities
+install_npm
 install_git
 install_docker
 install_vscode
